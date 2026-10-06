@@ -1,0 +1,7 @@
+{
+  "wnba": {"2026": {"season": "2026", "season_types": ["Regular Season", "Playoffs"]}},
+  "nba": {
+    "2025-26": {"season": "2025-26", "season_types": ["Regular Season", "Playoffs"]},
+    "2026-27": {"season": "2026-27", "season_types": ["Pre Season", "Regular Season"]}
+  }
+}
