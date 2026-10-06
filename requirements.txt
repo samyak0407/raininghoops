@@ -7,3 +7,4 @@ requests
 jupyter
 matplotlib
 plotly
+nba_api
