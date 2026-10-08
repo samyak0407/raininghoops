@@ -1,11 +1,14 @@
 """NBA/WNBA official stats ingestion client.
 
-Uses nba_api to access NBA.com Stats endpoints. Requests are deliberately
-chunked by month because large season-wide responses can time out from
-cloud-hosted environments.
+Primary source: NBA.com Stats via nba_api.
+
+For WNBA ingestion, a versioned SportsDataverse release is used as a
+fallback when stats.nba.com is unreachable from the execution environment.
+This preserves reproducibility without requiring paid data.
 """
 from __future__ import annotations
 
+import io
 import time
 from dataclasses import dataclass
 
@@ -41,11 +44,18 @@ DEFAULT_HEADERS = {
 }
 
 
+WNBA_FALLBACK_URL = (
+    "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/"
+    "wnba_stats_player_game_logs/player_game_logs_{season}.parquet"
+)
+
+
 @dataclass
 class OfficialStatsClient:
     request_pause: float = 1.0
     timeout: float = 90.0
     max_retries: int = 3
+    last_source: str = "NBA.com Stats via nba_api"
 
     def _fetch_month(
         self,
@@ -85,30 +95,116 @@ class OfficialStatsClient:
             f"after {self.max_retries} attempts."
         ) from last_error
 
+    @staticmethod
+    def _fallback_months(league: LeagueConfig) -> range:
+        # Restrict requests to months in which regular-season games can exist.
+        if league.name == "WNBA":
+            return range(5, 10)
+        return range(10, 13)
+
+    def _fetch_wnba_fallback(self, season: str, season_type: str) -> pd.DataFrame:
+        if season_type != "Regular Season":
+            raise RuntimeError(
+                "The WNBA fallback currently supports Regular Season only."
+            )
+
+        url = WNBA_FALLBACK_URL.format(season=season)
+        response = requests.get(
+            url,
+            timeout=self.timeout,
+            headers={"User-Agent": DEFAULT_HEADERS["User-Agent"]},
+        )
+        response.raise_for_status()
+
+        frame = pd.read_parquet(io.BytesIO(response.content))
+
+        # The published release contains both player and team rows and both
+        # regular-season and playoff records. Keep only player regular-season
+        # rows so the output matches our player-game-log contract.
+        if "player_id" in frame.columns:
+            frame = frame[frame["player_id"].notna()].copy()
+        if "season_type" in frame.columns:
+            frame = frame[
+                frame["season_type"].astype(str).str.lower().eq("regular-season")
+            ].copy()
+
+        rename_map = {
+            "player_id": "PLAYER_ID",
+            "player_name": "PLAYER_NAME",
+            "team_id": "TEAM_ID",
+            "team_abbreviation": "TEAM_ABBREVIATION",
+            "game_id": "GAME_ID",
+            "game_date": "GAME_DATE",
+            "min": "MIN",
+            "fgm": "FGM",
+            "fga": "FGA",
+            "fg3m": "FG3M",
+            "fg3a": "FG3A",
+            "ftm": "FTM",
+            "fta": "FTA",
+            "oreb": "OREB",
+            "dreb": "DREB",
+            "reb": "REB",
+            "ast": "AST",
+            "stl": "STL",
+            "blk": "BLK",
+            "tov": "TOV",
+            "pf": "PF",
+            "pts": "PTS",
+            "plus_minus": "PLUS_MINUS",
+            "wl": "WL",
+            "matchup": "MATCHUP",
+        }
+        frame = frame.rename(columns=rename_map)
+        frame["LEAGUE"] = "WNBA"
+
+        self.last_source = "SportsDataverse WNBA Stats release (NBA.com Stats source)"
+        return frame
+
     def player_game_logs(
         self,
         season: str,
         season_type: str = "Regular Season",
         league: LeagueConfig = NBA,
     ) -> pd.DataFrame:
-        """Fetch league-wide player game logs in monthly chunks.
+        """Fetch league-wide player game logs.
 
-        Monthly requests keep payloads smaller and make cloud-hosted ingestion
-        substantially more resilient to NBA.com read timeouts.
+        NBA.com Stats is attempted first. If WNBA requests fail because
+        stats.nba.com is unreachable, the published SportsDataverse WNBA
+        Stats release is used as a reproducible fallback.
         """
         frames: list[pd.DataFrame] = []
 
-        for month in range(1, 13):
-            frame = self._fetch_month(
+        months = (
+            self._fallback_months(league)
+            if league.name == "WNBA"
+            else range(10, 13)
+        )
+
+        try:
+            for month in months:
+                frame = self._fetch_month(
+                    season=season,
+                    season_type=season_type,
+                    league=league,
+                    month=month,
+                )
+                if not frame.empty:
+                    frames.append(frame)
+        except RuntimeError:
+            if league.name != "WNBA":
+                raise
+            return self._fetch_wnba_fallback(
                 season=season,
                 season_type=season_type,
-                league=league,
-                month=month,
             )
-            if not frame.empty:
-                frames.append(frame)
 
         if not frames:
+            if league.name == "WNBA":
+                return self._fetch_wnba_fallback(
+                    season=season,
+                    season_type=season_type,
+                )
             raise RuntimeError(
                 f"No player-game-log response for {league.name} {season}."
             )
@@ -118,4 +214,5 @@ class OfficialStatsClient:
             subset=["GAME_ID", "PLAYER_ID"],
             keep="last",
         )
+        self.last_source = "NBA.com Stats via nba_api"
         return combined
