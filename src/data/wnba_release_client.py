@@ -78,6 +78,13 @@ class WNBAStatsReleaseClient:
                 frame["season_type"].astype(str).str.lower().eq(wanted)
             ].copy()
 
+        # The published release does not expose BLKA or PFD. Preserve the
+        # normalized schema without fabricating values; downstream code can
+        # treat these as unavailable.
+        for optional_column in ("blka", "pfd"):
+            if optional_column not in frame.columns:
+                frame[optional_column] = pd.NA
+
         missing = [column for column in COLUMN_MAP if column not in frame.columns]
         if missing:
             raise ValueError(
