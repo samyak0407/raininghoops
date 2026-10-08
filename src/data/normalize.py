@@ -6,6 +6,7 @@ import pandas as pd
 
 COLUMN_MAP = {
     "SEASON_YEAR": "season",
+    "SEASON_TYPE": "season_type",
     "PLAYER_ID": "player_id",
     "PLAYER_NAME": "player_name",
     "TEAM_ID": "team_id",
@@ -68,6 +69,9 @@ def normalize_player_game_logs(frame: pd.DataFrame) -> pd.DataFrame:
 
     out = frame.rename(columns=COLUMN_MAP).copy()
 
+    if "SEASON_TYPE" not in frame.columns:
+        out["season_type"] = "UNKNOWN"
+
     if "LEAGUE" in frame.columns:
         out["league"] = frame["LEAGUE"].astype("string")
     elif "league" not in out.columns:
@@ -83,7 +87,7 @@ def normalize_player_game_logs(frame: pd.DataFrame) -> pd.DataFrame:
 
     # Keep only the stable normalized contract plus league metadata.
     keep = [
-        "league", "season", "player_id", "player_name", "team_id",
+        "league", "season", "season_type", "player_id", "player_name", "team_id",
         "team_abbreviation", "team_name", "game_id", "game_date",
         "matchup", "home_away", "result", "minutes", "fgm", "fga",
         "fg_pct", "fg3m", "fg3a", "fg3_pct", "ftm", "fta", "ft_pct",
