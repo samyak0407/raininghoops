@@ -40,15 +40,41 @@ COLUMN_MAP = {
 }
 
 
+def _parse_minutes(series: pd.Series) -> pd.Series:
+    """Convert NBA-style minutes such as '32:15' or numeric minutes to floats."""
+    text = series.astype("string").str.strip()
+
+    colon_mask = text.str.contains(":", na=False)
+    result = pd.to_numeric(text, errors="coerce")
+
+    if colon_mask.any():
+        parts = text[colon_mask].str.split(":", n=1, expand=True)
+        mins = pd.to_numeric(parts[0], errors="coerce")
+        secs = pd.to_numeric(parts[1], errors="coerce")
+        result.loc[colon_mask] = mins + secs / 60.0
+
+    return result
+
+
 def normalize_player_game_logs(frame: pd.DataFrame) -> pd.DataFrame:
+    """Normalize an official player-game-log dataframe.
+
+    The official API client adds LEAGUE metadata before calling this function.
+    Tests and other callers may omit it; in that case the contract uses UNKNOWN.
+    """
     missing = sorted(set(COLUMN_MAP) - set(frame.columns))
     if missing:
         raise ValueError(f"Official stats response is missing columns: {missing}")
 
     out = frame.rename(columns=COLUMN_MAP).copy()
 
+    if "LEAGUE" in frame.columns:
+        out["league"] = frame["LEAGUE"].astype("string")
+    elif "league" not in out.columns:
+        out["league"] = "UNKNOWN"
+
     out["game_date"] = pd.to_datetime(out["game_date"], errors="coerce")
-    out["minutes"] = pd.to_numeric(out["minutes"], errors="coerce")
+    out["minutes"] = _parse_minutes(out["minutes"])
 
     # Matchup strings normally look like "LAL vs. BOS" or "LAL @ BOS".
     out["home_away"] = out["matchup"].astype("string").map(
@@ -64,4 +90,9 @@ def normalize_player_game_logs(frame: pd.DataFrame) -> pd.DataFrame:
         "oreb", "dreb", "reb", "ast", "tov", "stl", "blk", "blka",
         "pf", "pfd", "pts", "plus_minus",
     ]
-    return out[keep].sort_values(["game_date", "game_id", "player_id"]).reset_index(drop=True)
+
+    return (
+        out[keep]
+        .sort_values(["game_date", "game_id", "player_id"])
+        .reset_index(drop=True)
+    )
