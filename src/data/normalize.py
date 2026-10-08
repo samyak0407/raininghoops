@@ -63,7 +63,8 @@ def normalize_player_game_logs(frame: pd.DataFrame) -> pd.DataFrame:
     The official API client adds LEAGUE metadata before calling this function.
     Tests and other callers may omit it; in that case the contract uses UNKNOWN.
     """
-    missing = sorted(set(COLUMN_MAP) - set(frame.columns))
+    required_columns = set(COLUMN_MAP) - {"SEASON_TYPE"}
+    missing = sorted(required_columns - set(frame.columns))
     if missing:
         raise ValueError(f"Official stats response is missing columns: {missing}")
 
