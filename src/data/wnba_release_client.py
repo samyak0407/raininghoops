@@ -86,5 +86,6 @@ class WNBAStatsReleaseClient:
             )
 
         raw = frame[list(COLUMN_MAP)].rename(columns=COLUMN_MAP)
+        raw["SEASON_TYPE"] = frame["season_type"].astype("string")
         raw["LEAGUE"] = "WNBA"
         return raw.reset_index(drop=True)
