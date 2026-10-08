@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from src.data.nba_stats_client import NBA, WNBA, OfficialStatsClient
+from src.data.wnba_release_client import WNBAStatsReleaseClient
 from src.data.normalize import normalize_player_game_logs
 from src.data.quality import assert_valid_player_game_logs, validate_player_game_logs
 
@@ -22,6 +23,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--season", required=True)
     parser.add_argument("--season-type", default="Regular Season")
     parser.add_argument("--output-dir", default="data/raw/player_game_logs")
+    parser.add_argument("--source", choices=["official", "wnba-release"], default="official")
     return parser.parse_args()
 
 
@@ -29,12 +31,23 @@ def main() -> None:
     args = parse_args()
     league = NBA if args.league == "NBA" else WNBA
 
-    client = OfficialStatsClient()
-    raw = client.player_game_logs(
-        season=args.season,
-        season_type=args.season_type,
-        league=league,
-    )
+    if args.source == "wnba-release":
+        if args.league != "WNBA":
+            raise ValueError("--source wnba-release is only valid with --league WNBA.")
+        client = WNBAStatsReleaseClient()
+        raw = client.player_game_logs(
+            season=args.season,
+            season_type=args.season_type,
+        )
+        source_label = "WNBA Stats official endpoints via SportsDataverse versioned release"
+    else:
+        client = OfficialStatsClient()
+        raw = client.player_game_logs(
+            season=args.season,
+            season_type=args.season_type,
+            league=league,
+        )
+        source_label = "WNBA/NBA Stats via nba_api"
     normalized = normalize_player_game_logs(raw)
 
     # Fail closed: never persist a dataset that violates the core contract.
@@ -54,7 +67,7 @@ def main() -> None:
         "league": args.league,
         "season": args.season,
         "season_type": args.season_type,
-        "source": client.last_source,
+        "source": source_label,
         "retrieved_at_utc": datetime.now(timezone.utc).isoformat(),
         "rows": len(normalized),
         "players": int(normalized["player_id"].nunique()),
