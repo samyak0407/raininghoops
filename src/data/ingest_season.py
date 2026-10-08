@@ -54,7 +54,7 @@ def main() -> None:
         "league": args.league,
         "season": args.season,
         "season_type": args.season_type,
-        "source": "NBA.com Stats via nba_api",
+        "source": client.last_source,
         "retrieved_at_utc": datetime.now(timezone.utc).isoformat(),
         "rows": len(normalized),
         "players": int(normalized["player_id"].nunique()),
