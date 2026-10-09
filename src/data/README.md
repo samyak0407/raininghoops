@@ -44,3 +44,30 @@ Each request stores the raw JSON response under `data/snapshots/espn_<league>_<r
 6. Provenance metadata
 
 Live access is not required for unit tests; tests should use representative mocked responses.
+
+
+## Player identity resolution
+
+The ESPN injury `player_id` is an ESPN athlete ID, not automatically the NBA
+or WNBA stats provider's player ID. The resolver in
+`src/data/player_identity.py` maps IDs only through a supplied crosswalk and
+requires league and team consistency. It falls back to a unique exact normalized
+name + team match only when the ESPN ID is absent from the crosswalk. Ambiguous,
+conflicting, or low-confidence records remain unresolved.
+
+Prepare and review a crosswalk CSV with a `league` column, ESPN athlete ID,
+league player ID/name, team abbreviation, and preferably `match_confidence`.
+Common field aliases such as `espn_athlete_id` and `nba_player_id` are
+supported. Keep a source/version/as-of date for the crosswalk; do not mix
+stale rosters into current injury matching.
+
+Optionally enrich ESPN injury rows during ingestion:
+
+```bash
+python -m src.data.ingest_espn --league NBA --resource injuries --crosswalk data/reference/player_id_crosswalk.csv
+```
+
+Without `--crosswalk`, ingestion continues to save the normalized ESPN data
+without league-ID enrichment. Both injury and news CSVs include
+`retrieved_at_utc`; this is the observation timestamp and must not be replaced
+with the injury's reported date.
