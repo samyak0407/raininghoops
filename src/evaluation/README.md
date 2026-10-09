@@ -1,6 +1,6 @@
 # Evaluation
 
-Raining Hoops evaluates predictions chronologically, not randomly.
+Raining Hoops evaluates predictions chronologically, not randomly. Use `chronological_split` to create train, validation, and test windows from explicit date cutoffs. Select cutoffs for the actual league/season; the function defaults are examples, not universal season boundaries.
 
 ## Metrics
 
