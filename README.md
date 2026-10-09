@@ -17,6 +17,10 @@ The project combines player-role intelligence, matchup analysis, prediction, mar
 
 ## Core research ideas
 
+Metric formulas, edge cases, and validation requirements are documented in
+[docs/metric_specifications.md](docs/metric_specifications.md). The data-to-model
+flow and current system boundaries are in [docs/architecture.md](docs/architecture.md).
+
 ### RH Opportunity Index
 Estimate the opportunity available to a player before translating opportunity into production.
 
