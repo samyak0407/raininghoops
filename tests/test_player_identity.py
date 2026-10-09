@@ -95,3 +95,17 @@ def test_low_confidence_crosswalk_is_unresolved():
 def test_invalid_threshold_is_rejected():
     with pytest.raises(ValueError, match="min_confidence"):
         resolve_player_identity(injury(), crosswalk(), min_confidence=2)
+
+
+def test_crosswalk_with_separate_nba_and_wnba_columns_resolves_by_league():
+    rows = [{
+        "league": "WNBA", "espn_athlete_id": "espn-wnba-1",
+        "nba_player_id": None, "wnba_player_id": 2001,
+        "nba_player_name": None, "wnba_player_name": "Jordan Example",
+        "team_abbreviation": "ABC", "match_confidence": 0.99,
+    }]
+    result = resolve_player_identity(
+        injury(player_id="espn-wnba-1", league="WNBA"), crosswalk(rows)
+    )
+    assert result.iloc[0]["resolved_player_id"] == "2001"
+    assert result.iloc[0]["match_status"] == "matched"
