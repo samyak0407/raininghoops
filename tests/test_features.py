@@ -40,3 +40,26 @@ def test_opportunity_index_is_scoped_to_game_date():
     })], ignore_index=True)
     after_future_row = add_opportunity_index(extended)
     assert initial["rh_opportunity_index"].tolist() == after_future_row.iloc[:3]["rh_opportunity_index"].tolist()
+
+
+def test_rolling_features_do_not_mix_leagues_when_player_ids_collide():
+    from src.features.core import add_rolling_player_features
+
+    df = pd.DataFrame({
+        "league": ["NBA", "WNBA", "NBA", "WNBA"],
+        "player_id": [1, 1, 1, 1],
+        "game_id": [1, 1, 2, 2],
+        "game_date": pd.to_datetime(["2026-01-01", "2026-01-01", "2026-01-02", "2026-01-02"]),
+        "minutes": [30, 10, 40, 20],
+        "pts": [20, 5, 25, 8],
+        "fga": [15, 4, 16, 5],
+        "fg3a": [5, 1, 6, 2],
+        "fta": [4, 1, 5, 2],
+        "reb": [6, 2, 7, 3],
+        "ast": [5, 1, 6, 2],
+    })
+    out = add_rolling_player_features(df)
+    nba_second = out[(out["league"] == "NBA") & (out["game_id"] == 2)].iloc[0]
+    wnba_second = out[(out["league"] == "WNBA") & (out["game_id"] == 2)].iloc[0]
+    assert nba_second["pts_roll_5"] == 20
+    assert wnba_second["pts_roll_5"] == 5
