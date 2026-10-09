@@ -57,41 +57,63 @@ def _first_column(frame: pd.DataFrame, candidates: tuple[str, ...], required: bo
     return None
 
 
+def _coalesce_columns(
+    frame: pd.DataFrame,
+    candidates: tuple[str, ...],
+    default: Any = "",
+) -> pd.Series:
+    """Take the first non-empty value across alternate source column names."""
+    result = pd.Series(default, index=frame.index, dtype="object")
+    for column in candidates:
+        if column not in frame.columns:
+            continue
+        values = frame[column]
+        present = values.notna() & values.astype("string").str.strip().ne("")
+        mask = result.astype("string").str.strip().eq("") & present
+        result.loc[mask] = values.loc[mask].astype("string").str.strip()
+    return result.astype("string")
+
+
 def _canonical_crosswalk(crosswalk: pd.DataFrame) -> pd.DataFrame:
-    """Accept the project's canonical schema and common crosswalk field names."""
-    league_col = _first_column(crosswalk, ("league",))
-    espn_id_col = _first_column(crosswalk, ("espn_player_id", "espn_athlete_id"))
-    player_id_col = _first_column(
+    """Accept the project's schema and crosswalks with separate NBA/WNBA columns."""
+    if "league" not in crosswalk.columns:
+        raise ValueError("Crosswalk is missing required column: 'league'")
+
+    out = pd.DataFrame(index=crosswalk.index)
+    out["league"] = crosswalk["league"].astype("string").str.upper().str.strip()
+    out["espn_player_id"] = _coalesce_columns(
+        crosswalk, ("espn_player_id", "espn_athlete_id", "player_espn_id")
+    )
+    out["league_player_id"] = _coalesce_columns(
         crosswalk, ("league_player_id", "nba_player_id", "wnba_player_id", "player_id")
     )
-    player_name_col = _first_column(
+    out["league_player_name"] = _coalesce_columns(
         crosswalk, ("league_player_name", "nba_player_name", "wnba_player_name", "player_name")
     )
-    team_col = _first_column(crosswalk, ("team_abbreviation", "team_abbr", "team"))
-    confidence_col = _first_column(crosswalk, ("match_confidence", "confidence"), required=False)
+    out["team_abbreviation"] = _coalesce_columns(
+        crosswalk, ("team_abbreviation", "team_abbr", "team")
+    ).str.upper().str.strip()
+    out["espn_player_name"] = _coalesce_columns(
+        crosswalk, ("espn_player_name", "espn_full_name"), default=""
+    )
+    missing_espn_names = out["espn_player_name"].str.strip().eq("")
+    out.loc[missing_espn_names, "espn_player_name"] = out.loc[
+        missing_espn_names, "league_player_name"
+    ]
 
-    out = pd.DataFrame({
-        "league": crosswalk[league_col].astype("string").str.upper().str.strip(),
-        "espn_player_id": crosswalk[espn_id_col].astype("string").str.strip(),
-        "league_player_id": crosswalk[player_id_col].astype("string").str.strip(),
-        "league_player_name": crosswalk[player_name_col].astype("string").str.strip(),
-        "team_abbreviation": crosswalk[team_col].astype("string").str.upper().str.strip(),
-    })
-    out["espn_player_name"] = (
-        crosswalk[_first_column(crosswalk, ("espn_player_name", "espn_full_name"), required=False)]
-        .astype("string").str.strip()
-        if _first_column(crosswalk, ("espn_player_name", "espn_full_name"), required=False)
-        else out["league_player_name"]
-    )
-    out["match_confidence"] = (
-        pd.to_numeric(crosswalk[confidence_col], errors="coerce")
-        if confidence_col
-        else 1.0
-    )
+    confidence_columns = [name for name in ("match_confidence", "confidence") if name in crosswalk.columns]
+    if confidence_columns:
+        confidence = pd.Series(float("nan"), index=crosswalk.index, dtype="float64")
+        for column in confidence_columns:
+            values = pd.to_numeric(crosswalk[column], errors="coerce")
+            confidence = confidence.fillna(values)
+        out["match_confidence"] = confidence
+    else:
+        out["match_confidence"] = 1.0
+
     out["name_key"] = out["league_player_name"].map(normalize_player_name)
     out["espn_name_key"] = out["espn_player_name"].map(normalize_player_name)
     out["team_key"] = out["team_abbreviation"].map(normalize_team)
-    out = out.replace({"<NA>": ""})
     return out
 
 
