@@ -16,6 +16,18 @@ SOURCES = {
         "classification": "official", "base_url": "https://stats.wnba.com/",
         "supports": ["WNBA"],
     },
+    "espn": {
+        "name": "ESPN", "kind": "injury_and_news_context",
+        "classification": "external_public_api",
+        "base_url": "https://site.api.espn.com/apis/site/v2/sports/basketball",
+        "supports": ["NBA", "WNBA"],
+        "endpoints": ["/{league}/injuries", "/{league}/news"],
+        "notes": (
+            "Supplemental current injury/news context. Public endpoints are undocumented "
+            "and may change; coverage and update timing are not guaranteed. Preserve "
+            "retrieval timestamps and do not treat ESPN as the sole authoritative injury source."
+        ),
+    },
 }
 
 def get_source(name: str) -> dict:
