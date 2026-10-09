@@ -109,3 +109,16 @@ def test_crosswalk_with_separate_nba_and_wnba_columns_resolves_by_league():
     )
     assert result.iloc[0]["resolved_player_id"] == "2001"
     assert result.iloc[0]["match_status"] == "matched"
+
+
+def test_missing_espn_id_is_left_unresolved_without_crashing():
+    row = injury(player_id=pd.NA, player_name=pd.NA, team=pd.NA)
+    result = resolve_player_identity(row, crosswalk())
+    assert result.iloc[0]["match_status"] == "unresolved"
+    assert result.iloc[0]["resolved_player_id"] is None
+
+
+def test_empty_crosswalk_marks_records_unresolved():
+    result = resolve_player_identity(injury(), pd.DataFrame())
+    assert result.iloc[0]["match_status"] == "unresolved"
+    assert result.iloc[0]["match_reason"] == "empty_crosswalk"
