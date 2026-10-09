@@ -10,8 +10,10 @@ def add_rolling_player_features(df: pd.DataFrame, windows: tuple[int, ...] = (3,
         raise ValueError(f"Missing required columns: {sorted(missing)}")
     out = df.copy()
     out["game_date"] = pd.to_datetime(out["game_date"])
-    out = out.sort_values(["player_id", "game_date", "game_id"], kind="stable").copy()
-    grouped = out.groupby("player_id", group_keys=False)
+    group_cols = (["league"] if "league" in out.columns else []) + ["player_id"]
+    sort_cols = group_cols + ["game_date"] + (["game_id"] if "game_id" in out.columns else [])
+    out = out.sort_values(sort_cols, kind="stable").copy()
+    grouped = out.groupby(group_cols, group_keys=False, sort=False)
     for window in windows:
         for column in ("minutes", "pts", "fga", "fg3a", "fta", "reb", "ast"):
             out[f"{column}_roll_{window}"] = grouped[column].transform(
@@ -55,8 +57,9 @@ def add_opportunity_index(df: pd.DataFrame) -> pd.DataFrame:
     metrics = ["minutes_roll_5", "fga_roll_5", "fta_roll_5", "ast_roll_5"]
     standardized = pd.DataFrame(index=out.index)
 
+    cross_section = (["league"] if "league" in out.columns else []) + ["game_date"]
     for column in metrics:
-        grouped = out.groupby("game_date", dropna=False)[column]
+        grouped = out.groupby(cross_section, dropna=False)[column]
         means = grouped.transform("mean")
         stds = grouped.transform(lambda values: values.std(ddof=0))
         safe_stds = stds.where(stds.ne(0), np.nan)
@@ -64,7 +67,7 @@ def add_opportunity_index(df: pd.DataFrame) -> pd.DataFrame:
 
     out["rh_opportunity_raw"] = standardized.mean(axis=1)
     out["rh_opportunity_index"] = (
-        out.groupby("game_date", dropna=False)["rh_opportunity_raw"]
+        out.groupby(cross_section, dropna=False)["rh_opportunity_raw"]
         .rank(method="average", pct=True) * 100
     )
     return out
