@@ -18,3 +18,25 @@ def test_role_shift_and_opportunity_are_created():
 def test_matchup_pressure():
     out=add_matchup_pressure(pd.DataFrame({"three_rate_roll_5":[0.40,0.30],"opp_three_rate_allowed":[0.35,0.35]}))
     assert out["matchup_pressure"].tolist() == [0.05,-0.05]
+
+
+def test_opportunity_index_is_scoped_to_game_date():
+    from src.features.core import add_opportunity_index
+
+    base = pd.DataFrame({
+        "game_date": ["2026-01-01"] * 3,
+        "minutes_roll_5": [20.0, 30.0, 40.0],
+        "fga_roll_5": [8.0, 12.0, 16.0],
+        "fta_roll_5": [2.0, 4.0, 6.0],
+        "ast_roll_5": [2.0, 5.0, 8.0],
+    })
+    initial = add_opportunity_index(base)
+    extended = pd.concat([base, pd.DataFrame({
+        "game_date": ["2026-02-01"],
+        "minutes_roll_5": [1000.0],
+        "fga_roll_5": [1000.0],
+        "fta_roll_5": [1000.0],
+        "ast_roll_5": [1000.0],
+    })], ignore_index=True)
+    after_future_row = add_opportunity_index(extended)
+    assert initial["rh_opportunity_index"].tolist() == after_future_row.iloc[:3]["rh_opportunity_index"].tolist()
