@@ -11,7 +11,7 @@ Raining Hoops features are designed to answer a basketball question before they 
 
 ## Leakage rule
 
-Every rolling statistic is shifted by one game before the rolling window is calculated. The current game's outcome can never enter its own features. The opportunity index standardizes and ranks players within the same game date, rather than using full-dataset means or ranks that would change when future rows are added. For a single-player date, the score is 100 by construction because no cross-sectional comparison is possible; treat that case as low-information.
+When a league column is present, player history is grouped by league and player ID to prevent cross-league ID collisions. Every rolling statistic is shifted by one game before the rolling window is calculated. The current game's outcome can never enter its own features. The opportunity index standardizes and ranks players within the same league and game date (or game date when league is not supplied), rather than using full-dataset means or ranks that would change when future rows are added. For a single-player date, the score is 100 by construction because no cross-sectional comparison is possible; treat that case as low-information.
 
 ## Promotion rule
 
