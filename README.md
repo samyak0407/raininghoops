@@ -92,6 +92,10 @@ raininghoops/
 ├── README.md
 ├── requirements.txt
 ├── .gitignore
+├── docs/
+│   ├── architecture.md
+│   └── metric_specifications.md
+├── .github/workflows/tests.yml
 ├── data/
 │   ├── raw/
 │   ├── processed/
@@ -102,6 +106,9 @@ raininghoops/
 │   └── 03_nba_preseason/
 ├── src/
 │   ├── data/
+│   │   ├── espn_client.py
+│   │   ├── player_identity.py
+│   │   └── quality.py
 │   ├── features/
 │   ├── models/
 │   ├── matchup/
