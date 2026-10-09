@@ -1,10 +1,14 @@
 name: Python tests
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+
+permissions:
+  contents: read
 
 jobs:
   pytest:
@@ -15,6 +19,7 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
+          cache-dependency-path: requirements.txt
       - name: Install test dependencies
         run: python -m pip install --upgrade pip pandas numpy scikit-learn pytest requests
       - name: Run unit tests
