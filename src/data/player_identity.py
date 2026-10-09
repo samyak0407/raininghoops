@@ -41,6 +41,13 @@ def normalize_team(value: Any) -> str:
     return re.sub(r"[^A-Z0-9]", "", str(value).upper().strip())
 
 
+def _safe_string(value: Any) -> str:
+    """Convert scalar identifiers safely, including pandas missing values."""
+    if value is None or pd.isna(value):
+        return ""
+    return str(value).strip()
+
+
 def _first_column(frame: pd.DataFrame, candidates: tuple[str, ...], required: bool = True) -> str | None:
     for candidate in candidates:
         if candidate in frame.columns:
@@ -127,8 +134,8 @@ def resolve_player_identity(
 
     results: list[dict[str, Any]] = []
     for _, injury in injuries.iterrows():
-        league = str(injury.get("league", "") or "").upper().strip()
-        espn_id = str(injury.get("player_id", "") or "").strip()
+        league = _safe_string(injury.get("league", "")).upper()
+        espn_id = _safe_string(injury.get("player_id", ""))
         name_key = normalize_player_name(injury.get("player_name"))
         team_key = normalize_team(injury.get("team_abbreviation"))
         league_cw = cw[cw["league"] == league]
@@ -183,10 +190,19 @@ def resolve_player_identity(
                     "resolved_player_name": str(candidate["league_player_name"]),
                     "resolved_team_abbreviation": str(candidate["team_abbreviation"]),
                     "match_method": "exact_name_team",
-                    "match_confidence": 0.99,
+                    "match_confidence": float(candidate["match_confidence"]) if pd.notna(candidate["match_confidence"]) else 0.99,
                     "match_status": "matched",
                     "match_reason": "unique_exact_name_and_team",
                 })
+                if result["match_confidence"] < min_confidence:
+                    result.update({
+                        "resolved_player_id": None,
+                        "resolved_player_name": None,
+                        "resolved_team_abbreviation": None,
+                        "match_method": None,
+                        "match_status": "unresolved",
+                        "match_reason": "crosswalk_confidence_below_threshold",
+                    })
             elif len(ids) > 1:
                 result["match_reason"] = "ambiguous_exact_name_and_team"
             else:
