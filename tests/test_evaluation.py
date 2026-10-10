@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from src.evaluation.metrics import regression_metrics, classification_metrics, calibration_table, chronological_split
 
 def test_regression_metrics():
