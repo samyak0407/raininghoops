@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 from src.features.core import add_matchup_pressure, add_opportunity_index, add_role_shift_features, add_rolling_player_features
 
@@ -17,7 +18,7 @@ def test_role_shift_and_opportunity_are_created():
 
 def test_matchup_pressure():
     out=add_matchup_pressure(pd.DataFrame({"three_rate_roll_5":[0.40,0.30],"opp_three_rate_allowed":[0.35,0.35]}))
-    assert out["matchup_pressure"].tolist() == [0.05,-0.05]
+    assert np.allclose(out["matchup_pressure"].to_numpy(), [0.05,-0.05])
 
 
 def test_opportunity_index_is_scoped_to_game_date():
